@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -9,37 +10,49 @@ import (
 
 	"github.com/efemirik/guardian-auth-api/internal/controllers"
 	"github.com/efemirik/guardian-auth-api/internal/database"
+	"github.com/efemirik/guardian-auth-api/internal/middleware"
 )
 
 func main() {
-	// Load environment variables from .env file
+	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: No .env file found. Using default environment variables.")
 	}
 
-	// Initialize PostgreSQL connection pool and auto-migration
+	// Connect to PostgreSQL and run migrations
 	log.Println("Attempting to connect to database...")
 	database.Connect()
 
 	// Initialize Gin router
 	router := gin.Default()
 
-	// Health check endpoint for infrastructure monitoring
+	// Public Routes (No authentication required)
 	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status":  "success",
-			"message": "Guardian Auth API is running smoothly 🛡️",
-		})
+		c.JSON(200, gin.H{"status": "success", "message": "API is online"})
 	})
 
-	// Setup Authentication Routes
 	authGroup := router.Group("/api/auth")
 	{
 		authGroup.POST("/register", controllers.Register)
 		authGroup.POST("/login", controllers.Login)
 	}
 
-	// Start the server with fallback port
+	// Protected Routes (Require valid JWT)
+	protectedGroup := router.Group("/api/protected")
+	protectedGroup.Use(middleware.RequireAuth) // Apply the security wall here
+	{
+		// Example of a route only accessible with a token
+		protectedGroup.GET("/profile", func(c *gin.Context) {
+			// Retrieve the userID injected by the middleware
+			userID, _ := c.Get("userID")
+			c.JSON(http.StatusOK, gin.H{
+				"message": "Welcome to the secure zone!",
+				"user_id": userID,
+			})
+		})
+	}
+
+	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
