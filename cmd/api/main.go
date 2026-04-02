@@ -6,7 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	
+
+	"github.com/efemirik/guardian-auth-api/internal/controllers"
 	"github.com/efemirik/guardian-auth-api/internal/database"
 )
 
@@ -16,7 +17,7 @@ func main() {
 		log.Println("Warning: No .env file found. Using default environment variables.")
 	}
 
-	// Initialize PostgreSQL connection pool
+	// Initialize PostgreSQL connection pool and auto-migration
 	log.Println("Attempting to connect to database...")
 	database.Connect()
 
@@ -31,10 +32,17 @@ func main() {
 		})
 	})
 
+	// Setup Authentication Routes
+	authGroup := router.Group("/api/auth")
+	{
+		authGroup.POST("/register", controllers.Register)
+		authGroup.POST("/login", controllers.Login)
+	}
+
 	// Start the server with fallback port
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080" 
+		port = "8080"
 	}
 
 	log.Printf("Starting server on port %s...", port)
